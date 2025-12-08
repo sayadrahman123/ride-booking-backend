@@ -1,5 +1,7 @@
 package com.example.ridebooking.controller;
 
+import com.example.ridebooking.dto.CompleteRideRequest;
+import com.example.ridebooking.dto.LocationUpdateRequest;
 import com.example.ridebooking.entity.Ride;
 import com.example.ridebooking.repository.DriverRepository;
 import com.example.ridebooking.security.AuthUtils;
@@ -67,5 +69,33 @@ public class RideController {
         } else {
             return ResponseEntity.status(404).body(Map.of("error", "no matching reservation found"));
         }
+    }
+
+    @PostMapping("/{rideId}/start")
+    @PreAuthorize("hasAuthority('ROLE_DRIVER')")
+    public ResponseEntity<?> startRide(@PathVariable String rideId) {
+        Long userId = authUtils.requireCurrentUserId();
+        Long driverId = driverRepository.findByUserId(userId).map(d -> d.getId()).orElseThrow(() -> new IllegalStateException("Driver profile not found"));
+        Ride r = rideService.startRide(rideId, driverId);
+        return ResponseEntity.ok(Map.of("rideId", r.getExternalId(), "status", r.getStatus()));
+    }
+
+    @PostMapping("/{rideId}/location")
+    @PreAuthorize("hasAuthority('ROLE_DRIVER')")
+    public ResponseEntity<?> updateLocation(@PathVariable String rideId, @RequestBody LocationUpdateRequest req) {
+        Long userId = authUtils.requireCurrentUserId();
+        Long driverId = driverRepository.findByUserId(userId).map(d -> d.getId()).orElseThrow(() -> new IllegalStateException("Driver profile not found"));
+        // ensure driverId from token matches req.driverId (or prefer token-derived)
+        rideService.updateRideLocation(rideId, driverId, req.getLat(), req.getLng(), req.getSpeedMps());
+        return ResponseEntity.ok(Map.of("status", "location_updated"));
+    }
+
+    @PostMapping("/{rideId}/complete")
+    @PreAuthorize("hasAuthority('ROLE_DRIVER')")
+    public ResponseEntity<?> completeRide(@PathVariable String rideId, @RequestBody CompleteRideRequest req) {
+        Long userId = authUtils.requireCurrentUserId();
+        Long driverId = driverRepository.findByUserId(userId).map(d -> d.getId()).orElseThrow(() -> new IllegalStateException("Driver profile not found"));
+        Ride r = rideService.completeRide(rideId, driverId, req.getDistanceMeters(), req.getDurationSeconds());
+        return ResponseEntity.ok(Map.of("rideId", r.getExternalId(), "status", r.getStatus()));
     }
 }
