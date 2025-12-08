@@ -14,4 +14,8 @@ public interface RideService {
      * Returns true if a lock was removed.
      */
     boolean rejectRide(String rideExternalId, Long driverId);
+
+    Ride startRide(String rideExternalId, Long driverId);
+    void updateRideLocation(String rideExternalId, Long driverId, Double lat, Double lng, Double speedMps);
+    Ride completeRide(String rideExternalId, Long driverId, Long distanceMeters, Long durationSeconds);
 }
