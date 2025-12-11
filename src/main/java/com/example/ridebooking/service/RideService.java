@@ -1,6 +1,7 @@
 package com.example.ridebooking.service;
 
 import com.example.ridebooking.entity.Ride;
+import com.example.ridebooking.entity.RideRecord;
 
 public interface RideService {
     /**
@@ -17,5 +18,5 @@ public interface RideService {
 
     Ride startRide(String rideExternalId, Long driverId);
     void updateRideLocation(String rideExternalId, Long driverId, Double lat, Double lng, Double speedMps);
-    Ride completeRide(String rideExternalId, Long driverId, Long distanceMeters, Long durationSeconds);
+    RideRecord completeRide(String rideExternalId, Long driverId, Long distanceMeters, long durationSeconds);
 }

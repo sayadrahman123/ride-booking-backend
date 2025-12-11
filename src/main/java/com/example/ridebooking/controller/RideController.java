@@ -3,6 +3,8 @@ package com.example.ridebooking.controller;
 import com.example.ridebooking.dto.CompleteRideRequest;
 import com.example.ridebooking.dto.LocationUpdateRequest;
 import com.example.ridebooking.entity.Ride;
+import com.example.ridebooking.entity.RideRecord;
+import com.example.ridebooking.entity.RideStatus;
 import com.example.ridebooking.repository.DriverRepository;
 import com.example.ridebooking.security.AuthUtils;
 import com.example.ridebooking.service.RideService;
@@ -95,7 +97,7 @@ public class RideController {
     public ResponseEntity<?> completeRide(@PathVariable String rideId, @RequestBody CompleteRideRequest req) {
         Long userId = authUtils.requireCurrentUserId();
         Long driverId = driverRepository.findByUserId(userId).map(d -> d.getId()).orElseThrow(() -> new IllegalStateException("Driver profile not found"));
-        Ride r = rideService.completeRide(rideId, driverId, req.getDistanceMeters(), req.getDurationSeconds());
-        return ResponseEntity.ok(Map.of("rideId", r.getExternalId(), "status", r.getStatus()));
+        RideRecord r = rideService.completeRide(rideId, driverId, req.getDistanceMeters(), req.getDurationSeconds());
+        return ResponseEntity.ok(Map.of("rideId", r.getRideId(), "status", RideStatus.COMPLETED));
     }
 }

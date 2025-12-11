@@ -1,15 +1,16 @@
 package com.example.ridebooking.service.impl;
 
-import com.example.ridebooking.entity.Driver;
-import com.example.ridebooking.entity.Ride;
-import com.example.ridebooking.entity.RideLocation;
-import com.example.ridebooking.entity.RideStatus;
+import com.example.ridebooking.entity.*;
+import com.example.ridebooking.fare.FareEngine;
+import com.example.ridebooking.fare.FareResult;
 import com.example.ridebooking.repository.DriverRepository;
 import com.example.ridebooking.repository.RideLocationRepository;
+import com.example.ridebooking.repository.RideRecordRepository;
 import com.example.ridebooking.repository.RideRepository;
 import com.example.ridebooking.redis.RedisKeys;
 import com.example.ridebooking.service.RideService;
 import com.example.ridebooking.service.RedisMatchService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import com.example.ridebooking.events.RideEvent;
 import java.time.Instant;
 
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -34,10 +36,23 @@ public class RideServiceImpl implements RideService {
     private final SimpMessagingTemplate simpMessagingTemplate;
     private final RideLocationRepository rideLocationRepository;
 
+    private final FareEngine fareEngine;
+    private final RideRecordRepository rideRecordRepository;
+    private final ObjectMapper objectMapper;           // jackson
+
+
     public RideServiceImpl(RideRepository rideRepository,
                            RedisMatchService redisMatchService,
                            DriverRepository driverRepository,
-                           RideEventPublisher rideEventPublisher, SimpMessagingTemplate simpMessagingTemplate, RideLocationRepository rideLocationRepository) {
+//                           RideEventPublisher rideEventPublisher,
+                           SimpMessagingTemplate simpMessagingTemplate,
+                           RideLocationRepository rideLocationRepository,
+                           FareEngine fareEngine,
+                           RideRecordRepository rideRecordRepository,
+                           ObjectMapper objectMapper,
+//                           RideRepository rideRepository,
+                           RideEventPublisher rideEventPublisher
+    ) {
         this.rideRepository = rideRepository;
         this.redisMatchService = redisMatchService;
         this.driverRepository = driverRepository;
@@ -45,6 +60,10 @@ public class RideServiceImpl implements RideService {
 
         this.simpMessagingTemplate = simpMessagingTemplate;
         this.rideLocationRepository = rideLocationRepository;
+
+        this.fareEngine = fareEngine;
+        this.rideRecordRepository = rideRecordRepository;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -171,29 +190,86 @@ public class RideServiceImpl implements RideService {
         simpMessagingTemplate.convertAndSend("/topic/ride." + rideExternalId, payload);
     }
 
+    /**
+     * Mark ride completed: calculate fare, persist ride record and publish completed event.
+     *
+     * @param rideExternalId        external ride id (eg "ride-101")
+     * @param distanceMeters distance in meters
+     * @param durationSeconds duration in seconds
+//     * @param surgeMultiplier surge multiplier (1.0 = normal)
+     * @return saved RideRecord
+     */
     @Override
     @Transactional
-    public Ride completeRide(String rideExternalId, Long driverId, Long distanceMeters, Long durationSeconds) {
-        Ride ride = rideRepository.findByExternalId(rideExternalId).orElseThrow(() -> new IllegalStateException("Ride not found"));
+    public RideRecord completeRide(String rideExternalId,
+                                   Long driverId,
+                                   Long distanceMeters,
+                                   long durationSeconds) {
+
+        // 0) defensive defaults
+        long distMeters = (distanceMeters != null) ? distanceMeters : 0L;
+        double surgeMultiplier = 1.0; // no surge in interface; default to normal
+
+        // 1) load ride by externalId
+        Ride ride = rideRepository.findByExternalId(rideExternalId)
+                .orElseThrow(() -> new IllegalArgumentException("Ride not found: " + rideExternalId));
+
+        // 2) calculate fare (adapt if your FareEngine signature differs)
+        // If your FareEngine.calculate(...) requires different types, adapt the call.
+        FareResult fareResult = fareEngine.calculate(distMeters, durationSeconds, surgeMultiplier);
+        long fareCents = fareResult.getFareCents();
+
+        // 3) serialize breakdown safely
+        String breakdownJson;
+        try {
+            breakdownJson = objectMapper.writeValueAsString(fareResult.getBreakdown());
+        } catch (Exception e) {
+            breakdownJson = fareResult.getBreakdown().toString();
+        }
+
+        // 4) build and save RideRecord
+        RideRecord record = RideRecord.builder()
+                .rideId(rideExternalId)
+                .riderId(ride.getRiderId())
+                .driverId(ride.getDriverId())
+                .startTime(ride.getStartedAt())
+                .endTime(Instant.now())
+                .distanceMeters(distMeters)
+                .durationSeconds(durationSeconds)
+                .fareCents(fareCents)
+                .fareBreakdownJson(breakdownJson)
+                .currency("INR")
+                .createdAt(Instant.now())
+                .build();
+
+        rideRecordRepository.save(record);
+
+        // 5) update ride status to COMPLETED
         ride.setStatus(RideStatus.COMPLETED);
-        ride.setCompletedAt(Instant.now());
-        // optionally store metrics on Ride (add fields if you want)
-        Ride saved = rideRepository.save(ride);
+        rideRepository.save(ride);
 
-        RideEvent ev = new RideEvent("ride.completed", rideExternalId, driverId, ride.getRiderId(), "COMPLETED", Instant.now());
-        rideEventPublisher.publish(ev);
+        // 6) publish ride.completed event
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("rideId", rideExternalId);
+        payload.put("driverId", ride.getDriverId());
+        payload.put("distanceMeters", distMeters);
+        payload.put("durationSeconds", durationSeconds);
+        payload.put("fareCents", fareCents);
+        payload.put("fareBreakdown", fareResult.getBreakdown());
+        payload.put("ts", Instant.now().toString());
 
-        Map<String, Object> payload = Map.of(
-                "event", "ride.completed",
-                "rideId", rideExternalId,
-                "driverId", driverId,
-                "distanceMeters", distanceMeters,
-                "durationSeconds", durationSeconds,
-                "ts", Instant.now().toString()
-        );
-        simpMessagingTemplate.convertAndSend("/topic/ride." + rideExternalId, payload);
+        // Use builder or constructor depending on your RideEvent class — using builder here
+        RideEvent event = RideEvent.builder()
+                .eventType("ride.completed")
+                .rideId(rideExternalId)
+                .payload(payload)
+                .build();
 
-        return saved;
+        rideEventPublisher.publish(event);
+
+        return record;
     }
+
+
 
 }

@@ -1,14 +1,29 @@
 package com.example.ridebooking.events;
 
 import java.time.Instant;
+import java.util.Map;
 
+import lombok.*;
+
+
+@Builder
+@AllArgsConstructor
 public class RideEvent {
+
+    // getters + setters
+    @Getter
     private String eventType;      // e.g., "ride.accepted"
+    @Setter
+    @Getter
     private String rideId;         // external ride id
+    @Setter
+    @Getter
     private Long driverId;
     private Long riderId;
+    @Getter
     private String status;         // ACCEPTED / REJECTED
     private Instant timestamp;
+    private Map<String,Object> payload;
 
     public RideEvent() {}
 
@@ -21,17 +36,4 @@ public class RideEvent {
         this.timestamp = timestamp;
     }
 
-    // getters + setters
-    public String getEventType() { return eventType; }
-    public void setEventType(String eventType) { this.eventType = eventType; }
-    public String getRideId() { return rideId; }
-    public void setRideId(String rideId) { this.rideId = rideId; }
-    public Long getDriverId() { return driverId; }
-    public void setDriverId(Long driverId) { this.driverId = driverId; }
-    public Long getRiderId() { return riderId; }
-    public void setRiderId(Long riderId) { this.riderId = riderId; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public Instant getTimestamp() { return timestamp; }
-    public void setTimestamp(Instant timestamp) { this.timestamp = timestamp; }
 }

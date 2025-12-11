@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface RideRepository extends JpaRepository<Ride, Long> {
     Optional<Ride> findByExternalId(String externalId);
+
+    Optional<Ride> findById(Long id);
 }

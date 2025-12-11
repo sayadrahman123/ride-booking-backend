@@ -103,6 +103,14 @@
 
         <!-- JSON (Jackson) is usually already present with spring-boot-starter-web -->
 
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.30</version> <!-- check latest -->
+            <scope>provided</scope>
+        </dependency>
+
+
 
     </dependencies>
 

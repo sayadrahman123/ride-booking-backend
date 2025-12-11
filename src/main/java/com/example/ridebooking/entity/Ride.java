@@ -34,6 +34,9 @@ public class Ride {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
+    public RideStatus getRideStatus() { return status; }
+    public void setRideStatus(RideStatus status) { this.status = status; }
+
     public String getExternalId() { return externalId; }
     public void setExternalId(String externalId) { this.externalId = externalId; }
 
