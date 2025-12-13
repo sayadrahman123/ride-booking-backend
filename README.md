@@ -121,7 +121,7 @@ com.example.ridebooking
 
 ### Steps
 ```bash
-git clone https://github.com/<your-username>/ride-booking-backend.git
+git clone https://github.com/sayadrahman123/ride-booking-backend.git
 cd ride-booking-backend
 mvn clean install
 mvn spring-boot:run
