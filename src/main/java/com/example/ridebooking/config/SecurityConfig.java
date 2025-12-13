@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/ws/**", "/app/**", "/topic/**", "/sockjs/**").permitAll()
                         .requestMatchers("/api/auth/**", "/actuator/health").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .userDetailsService(userDetailsService)
