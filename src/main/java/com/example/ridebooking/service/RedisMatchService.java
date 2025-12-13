@@ -131,4 +131,16 @@ public class RedisMatchService {
     public String getDriverReservation(String driverId) {
         return valOps.get(RedisKeys.DRIVER_LOCK_PREFIX + driverId);
     }
+
+    public boolean isDriverBusy(String driverId) {
+        return redisTemplate.hasKey(
+                RedisKeys.DRIVER_LOCK_PREFIX + driverId
+        );
+    }
+
+    public boolean isDriverAvailableById(String driverId) {
+        String val = valOps.get(RedisKeys.DRIVER_AVAIL_PREFIX + driverId);
+        return "true".equalsIgnoreCase(val);
+    }
+
 }
