@@ -45,6 +45,11 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**", "/app/**", "/topic/**", "/sockjs/**").permitAll()
                         .requestMatchers("/api/auth/**", "/actuator/health").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .userDetailsService(userDetailsService)
